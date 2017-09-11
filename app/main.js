@@ -3,13 +3,14 @@ const fs = require('fs');
 
 const windows = new Set();
 
-const createWindow = exports.createWindow = () => {
+const createWindow = exports.createWindow = (file) => {
   let newWindow = new BrowserWindow({ show: false });
   windows.add(newWindow); // Add to Set();
 
   newWindow.loadURL(`file://${__dirname}/index.html`);
   
   newWindow.once('ready-to-show', () => {
+    if (file) openFile(newWindow, file);
     newWindow.show();
   });
 
@@ -21,7 +22,7 @@ const createWindow = exports.createWindow = () => {
         title: 'Quit with Unsaved Changes?',
         message: 'Your changes will be lost if you do not save first.',
         buttons: [
-          'Quick Anyway',
+          'Quit Anyway',
           'Cancel'
         ],
         defaultId: 1,
@@ -55,11 +56,35 @@ const getFileFromUserSelection = exports.getFileFromUserSelection = (targetWindo
 const openFile = exports.openFile = (targetWindow, filePath) => {
   const file = filePath || getFileFromUserSelection(targetWindow);
   const content = fs.readFileSync(file).toString();
+
+  app.addRecentDocument(file);
+
   targetWindow.webContents.send('file-opened', file, content);
-  targetWindow.setTitle(`${file} - Fire Sale`);
   targetWindow.setRepresentedFilename(file);
+};
+
+const saveMarkdown = exports.saveMarkdown = (targetWindow, file, content) => {
+  if (!file) {
+    file = dialog.showSaveDialog(targetWindow, {
+      title: 'Save Markdown',
+      defaultPath: app.getPath('documents'),
+      filters: [
+        { name: 'Markdown Files', extensions: ['md', 'markdown'] }
+      ]
+    });
+  }
+
+  if (!file) return;
+  fs.writeFileSync(file, content); 
+  targetWindow.webContents.send('file-opened', file, content);
 };
 
 app.on('ready', () => {
   createWindow();
+});
+
+app.on('will-finish-launching', () => {
+  app.on('open-file', (event, filePath) => {
+    createWindow(filePath);
+  });
 });

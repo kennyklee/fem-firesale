@@ -18,10 +18,24 @@ const renderMarkdownToHtml = (markdown) => {
     htmlView.innerHTML = marked(markdown, { sanitize: true });
 };
 
+const updateEditedState = (isEdited) => {
+    currentWindow.setDocumentEdited(isEdited);
+
+    saveMarkdownButton.disabled = !isEdited;
+    revertButton.disabled = !isEdited;
+
+    let title = 'Fire Sale';
+    if (filePath) title = `${filePath} - ${title}`;
+    if (isEdited) title = `${title} (Edited)`;
+    currentWindow.setTitle(title);
+};
+
+// Color customization
+
 markdownView.addEventListener('keyup', (event) => {
     const currentContent = event.target.value;
     renderMarkdownToHtml(currentContent);
-    currentWindow.setDocumentEdited(currentContent !== originalContent);
+    updateEditedState(currentContent !== originalContent);
 });
 
 newFileButton.addEventListener('click', () => {
@@ -32,10 +46,16 @@ openFileButton.addEventListener('click', () => {
     mainProcess.openFile(currentWindow);
 });
 
+saveMarkdownButton.addEventListener('click', () => {
+    mainProcess.saveMarkdown(currentWindow, filePath, markdownView.value);
+});
+
 ipcRenderer.on('file-opened', (event, file, content) => {
     filePath = file;
     originalContent = content;
 
     markdownView.value = content;
     renderMarkdownToHtml(content);
+
+    updateEditedState(false);
 });
