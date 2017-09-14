@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, webContents } = require('electron');
 const fs = require('fs');
 
 const windows = new Set();
+const fileWatchers = new Map();
 
 const createWindow = exports.createWindow = (file) => {
   let newWindow = new BrowserWindow({ show: false });
@@ -35,6 +36,7 @@ const createWindow = exports.createWindow = (file) => {
 
   newWindow.on('closed', () => {
     windows.delete(newWindow);
+    stopWatchingFile(newWindow);2
     newWindow = null;
   });
 };
@@ -75,8 +77,29 @@ const saveMarkdown = exports.saveMarkdown = (targetWindow, file, content) => {
   }
 
   if (!file) return;
+
   fs.writeFileSync(file, content); 
   targetWindow.webContents.send('file-opened', file, content);
+};
+
+const startWatchingFile = (targetWindow, file) => {
+  stopWatchingFile(targetWindow);
+
+  const watcher = fs.watch(file, (event) => {
+    if (event === 'change') {
+      const content = fs.readFileSync(file).toString();
+      targetWindow.webContents.send('file-changed', file, content);
+    }
+  });
+
+  fileWatchers.set(targetWindow, watcher);
+};
+
+const stopWatchingFile = (targetWindow) => {
+  if (fileWatchers.has(targetWindow)) {
+    fileWatchers.get(targetWindow).close();
+    openFiles.delete(targetWindow);
+  }
 };
 
 app.on('ready', () => {
